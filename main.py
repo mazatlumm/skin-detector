@@ -1,4 +1,6 @@
 import io
+import os
+import requests
 import torch
 import torch.nn.functional as F
 from fastapi import FastAPI, UploadFile, File
@@ -7,14 +9,29 @@ from transformers import ViTForImageClassification, ViTImageProcessor
 
 app = FastAPI()
 
+# URL DigitalOcean tempat file model disimpan
+MODEL_URL = "https://boardingpas.sgp1.cdn.digitaloceanspaces.com/ai-model/pytorch_model.bin"
+MODEL_DIR = "./model"
+MODEL_FILE = os.path.join(MODEL_DIR, "pytorch_model.bin")
+
+# Download model jika belum ada di lokal
+os.makedirs(MODEL_DIR, exist_ok=True)
+if not os.path.exists(MODEL_FILE):
+    print("📥 Downloading model from DigitalOcean...")
+    r = requests.get(MODEL_URL, stream=True)
+    with open(MODEL_FILE, "wb") as f:
+        for chunk in r.iter_content(chunk_size=8192):
+            f.write(chunk)
+    print("✅ Model downloaded!")
+
 # Load model & processor
-model_path = "./model"
-model = ViTForImageClassification.from_pretrained(model_path)
-processor = ViTImageProcessor.from_pretrained("./model")
+model = ViTForImageClassification.from_pretrained(MODEL_DIR)
+processor = ViTImageProcessor.from_pretrained(MODEL_DIR)
 model.eval()
 
 # Ambil label dari config.json (id2label)
 id2label = model.config.id2label
+
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
@@ -40,7 +57,7 @@ async def predict(file: UploadFile = File(...)):
     return result
 
 
-# Tambahkan ini supaya otomatis jalan di port 5700
+# Supaya otomatis jalan di port 5700
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=5700, reload=False)
