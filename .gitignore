@@ -1,0 +1,4 @@
+/model/pytorch_model.bin
+/model/*.bin
+/venv
+/__pycache__
