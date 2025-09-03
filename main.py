@@ -4,17 +4,33 @@ import requests
 import torch
 import torch.nn.functional as F
 from fastapi import FastAPI, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 from transformers import ViTForImageClassification, ViTImageProcessor
 
 app = FastAPI()
 
-# URL DigitalOcean tempat file model disimpan
+# ===== CORS Middleware =====
+origins = [
+    "http://localhost:5600", 
+    "https://sehat.kediriku.id",      
+    "https://skin-disease.alicestech.com", 
+    "*"                                  
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ===== Download & load model =====
 MODEL_URL = "https://boardingpas.sgp1.cdn.digitaloceanspaces.com/ai-model/pytorch_model.bin"
 MODEL_DIR = "./model"
 MODEL_FILE = os.path.join(MODEL_DIR, "pytorch_model.bin")
 
-# Download model jika belum ada di lokal
 os.makedirs(MODEL_DIR, exist_ok=True)
 if not os.path.exists(MODEL_FILE):
     print("📥 Downloading model from DigitalOcean...")
@@ -24,30 +40,24 @@ if not os.path.exists(MODEL_FILE):
             f.write(chunk)
     print("✅ Model downloaded!")
 
-# Load model & processor
 model = ViTForImageClassification.from_pretrained(MODEL_DIR)
 processor = ViTImageProcessor.from_pretrained(MODEL_DIR)
 model.eval()
 
-# Ambil label dari config.json (id2label)
 id2label = model.config.id2label
 
-
+# ===== Predict endpoint =====
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
-    # Baca file gambar
     image_bytes = await file.read()
     image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
 
-    # Preprocess
     inputs = processor(images=image, return_tensors="pt")
 
-    # Inference
     with torch.no_grad():
         outputs = model(**inputs)
         probs = F.softmax(outputs.logits, dim=-1)[0]
 
-    # Cari prediksi terbaik
     confidence, predicted_class = torch.max(probs, dim=0)
     result = {
         "class": id2label[predicted_class.item()],
@@ -56,8 +66,7 @@ async def predict(file: UploadFile = File(...)):
 
     return result
 
-
-# Supaya otomatis jalan di port 5700
+# ===== Run server =====
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=5700, reload=False)
