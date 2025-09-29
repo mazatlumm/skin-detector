@@ -27,7 +27,7 @@ app.add_middleware(
 )
 
 # ===== Download & load model =====
-MODEL_URL = "https://boardingpas.sgp1.cdn.digitaloceanspaces.com/ai-model/pytorch_model.bin"
+MODEL_URL = "https://storage.alicestech.com/kediriku/pytorch_model.bin"
 MODEL_DIR = "./model"
 MODEL_FILE = os.path.join(MODEL_DIR, "pytorch_model.bin")
 
